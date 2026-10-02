@@ -219,7 +219,9 @@ public struct Animation : Hashable {
         recentWithAnimationAnimation = animation
         recentWithAnimationGeneration += 1
         let generation = recentWithAnimationGeneration
-        GlobalScope.async(Dispatchers.Main) {
+        // Dispatchers.Main has no MonotonicFrameClock, so withFrameNanos threw and the marker was never cleared;
+        // AndroidUiDispatcher.Main is Compose's own main dispatcher, which carries the frame clock.
+        GlobalScope.async(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
             // SKIP INSERT: withFrameNanos { _ -> }
             if recentWithAnimationGeneration == generation {
                 recentWithAnimationAnimation = nil

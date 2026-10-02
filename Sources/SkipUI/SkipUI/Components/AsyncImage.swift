@@ -15,6 +15,7 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.rememberAsyncImagePainter
 import coil3.compose.rememberConstraintsSizeResolver
 import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import coil3.fetch.Fetcher
 import coil3.fetch.FetchResult
 import coil3.ImageLoader
@@ -182,6 +183,12 @@ public struct AsyncImage : View, Renderable {
                     .decoderFactory(coil3.svg.SvgDecoder.Factory())
                     //.decoderFactory(coil3.gif.GifDecoder.Factory())
                     .decoderFactory(PdfDecoder.Factory())
+                    // Hardware bitmaps are GPU/EGL-backed rather than tracked on the regular Java
+                    // heap, and aren't being recycled promptly as images scroll out of view in a
+                    // long list - EGL/GL memory grows unbounded until the app OOMs. Regular
+                    // ARGB_8888 bitmaps are tracked normally and get reclaimed under memory
+                    // pressure like everything else.
+                    .allowHardware(false)
                     .data(requestSource)
                     .size(coil3.size.Size(width: maxPx, height: maxPx))
                     .memoryCacheKey(cacheKey)
@@ -211,6 +218,12 @@ public struct AsyncImage : View, Renderable {
                 .decoderFactory(coil3.svg.SvgDecoder.Factory())
                 //.decoderFactory(coil3.gif.GifDecoder.Factory())
                 .decoderFactory(PdfDecoder.Factory())
+                // Hardware bitmaps are GPU/EGL-backed rather than tracked on the regular Java
+                // heap, and aren't being recycled promptly as images scroll out of view in a
+                // long list - EGL/GL memory grows unbounded until the app OOMs. Regular
+                // ARGB_8888 bitmaps are tracked normally and get reclaimed under memory
+                // pressure like everything else.
+                .allowHardware(false)
                 .data(requestSource)
                 .size(sizeResolver)
                 .memoryCacheKey(cacheKey)
