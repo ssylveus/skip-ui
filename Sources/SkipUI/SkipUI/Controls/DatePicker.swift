@@ -193,20 +193,22 @@ public struct DatePicker : View, Renderable {
         guard isPresented.value else {
             return
         }
-        let timeZoneOffset = Double(TimeZone.current.secondsFromGMT())
-        let initialSeconds = selection.wrappedValue.timeIntervalSince1970 + timeZoneOffset
+        // Material's picker works in "midnight UTC of the calendar day". Convert through the calendar day, not through
+        // the device's current UTC offset: that offset differs from the one in effect on the picked date across a
+        // daylight-saving change, which made the picked day come back one day early.
+        let initialMillis = calendarDayUTCMillis(from: selection.wrappedValue)
         let displayMode = EnvironmentValues.shared.verticalSizeClass == .compact ? DisplayMode.Input : DisplayMode.Picker
 
         // Create selectable dates filter if range is specified
-        let minMillis: Long? = minDate != nil ? Long((minDate!.timeIntervalSince1970 + timeZoneOffset) * 1000.0) : nil
-        let maxMillis: Long? = maxDate != nil ? Long((maxDate!.timeIntervalSince1970 + timeZoneOffset) * 1000.0) : nil
+        let minMillis: Long? = minDate != nil ? calendarDayUTCMillis(from: minDate!) : nil
+        let maxMillis: Long? = maxDate != nil ? calendarDayUTCMillis(from: maxDate!) : nil
 
         let state: DatePickerState
         if minMillis != nil || maxMillis != nil {
             // SKIP INSERT: val selectableDates = object : SelectableDates { override fun isSelectableDate(utcTimeMillis: Long): Boolean { val min = minMillis; val max = maxMillis; if (min != null && utcTimeMillis < min) return false; if (max != null && utcTimeMillis > max) return false; return true } override fun isSelectableYear(year: Int): Boolean { return true } }
-            state = rememberDatePickerState(initialSelectedDateMillis: Long(initialSeconds * 1000.0), initialDisplayMode: displayMode, selectableDates: selectableDates)
+            state = rememberDatePickerState(initialSelectedDateMillis: initialMillis, initialDisplayMode: displayMode, selectableDates: selectableDates)
         } else {
-            state = rememberDatePickerState(initialSelectedDateMillis: Long(initialSeconds * 1000.0), initialDisplayMode: displayMode)
+            state = rememberDatePickerState(initialSelectedDateMillis: initialMillis, initialDisplayMode: displayMode)
         }
 
         let colors = DatePickerDefaults.colors(selectedDayContainerColor: tintColor, selectedYearContainerColor: tintColor, todayDateBorderColor: tintColor, currentYearContentColor: tintColor)
@@ -214,8 +216,27 @@ public struct DatePicker : View, Renderable {
             DatePicker(modifier: context.modifier, state: state, colors: colors)
         }
         if let millis = state.selectedDateMillis {
-            dateSelected(Date(timeIntervalSince1970: Double(millis / 1000.0) - timeZoneOffset))
+            dateSelected(localMidnight(fromCalendarDayUTCMillis: millis))
         }
+    }
+
+    /// The UTC-midnight millis of `date`'s calendar day in the device's time zone, which is what Material's date picker
+    /// takes and returns for a day.
+    private func calendarDayUTCMillis(from date: Date) -> Long {
+        let local = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? TimeZone.current
+        let midnight = utc.date(from: local) ?? date
+        return Long(midnight.timeIntervalSince1970 * 1000.0)
+    }
+
+    /// The device-time-zone midnight of the calendar day Material's picker reported as UTC-midnight `millis`.
+    private func localMidnight(fromCalendarDayUTCMillis millis: Long) -> Date {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? TimeZone.current
+        let picked = Date(timeIntervalSince1970: Double(millis) / 1000.0)
+        let day = utc.dateComponents([.year, .month, .day], from: picked)
+        return Calendar.current.date(from: day) ?? picked
     }
 
     // SKIP INSERT: @OptIn(ExperimentalMaterial3Api::class)
