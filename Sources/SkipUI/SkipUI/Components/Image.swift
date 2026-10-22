@@ -1018,15 +1018,19 @@ private let contentsCache: [AssetKey: URL?] = [:]
                 }
             }
             placeable = measurables[0].measure(constraints.copy(minWidth: width, maxWidth: width, minHeight: height, maxHeight: height))
-        } else if constraints.hasBoundedWidth && constraints.maxWidth > 0 {
+        } else if constraints.hasBoundedWidth && constraints.maxWidth > 0 && Int(Double(constraints.maxWidth) / ratio) <= 32766 {
             width = constraints.maxWidth
             height = Int(width / ratio)
             placeable = measurables[0].measure(constraints.copy(minWidth: width, maxWidth: width, minHeight: height, maxHeight: height))
-        } else if (constraints.hasBoundedHeight && constraints.maxHeight > 0) {
+        } else if constraints.hasBoundedHeight && constraints.maxHeight > 0 && Int(Double(constraints.maxHeight) * ratio) <= 32766 {
             height = constraints.maxHeight
             width = Int(height * ratio)
             placeable = measurables[0].measure(constraints.copy(minWidth: width, maxWidth: width, minHeight: height, maxHeight: height))
         } else {
+            // Also reached when the derived size is too large for Compose to represent as constraints. An intrinsic-size
+            // pass (a Row measuring its children as the screen rotates) hands an image a height of 32767, and a 3:2
+            // image's width from that, 49306, throws "Can't represent a width of 49306 and height of 32767".
+            // Measuring with the incoming constraints instead leaves the image its natural size.
             placeable = measurables[0].measure(constraints)
             width = placeable.width
             height = placeable.height
